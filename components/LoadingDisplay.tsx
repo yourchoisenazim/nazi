@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { LoadingSpinnerIcon } from './Icons';
-import { useLocale, TranslationKey } from '../i18n';
+import { useLocale } from '../i18n.ts';
+import { LoadingSpinnerIcon } from './Icons.tsx';
 
-const LoadingDisplay: React.FC = () => {
+export const LoadingDisplay = () => {
   const { t, loadingMessagesKeys } = useLocale();
-  const [messageKey, setMessageKey] = useState<TranslationKey>(loadingMessagesKeys[0]);
+  const [messageKey, setMessageKey] = useState(loadingMessagesKeys[0]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -19,13 +18,9 @@ const LoadingDisplay: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [loadingMessagesKeys]);
 
-  return (
-    <div className="flex flex-col items-center justify-center p-8 gap-6 text-center">
-      <LoadingSpinnerIcon />
-      <h2 className="text-2xl font-bold text-indigo-400">{t('loadingTitle')}</h2>
-      <p className="text-slate-400 min-h-[40px]">{t(messageKey)}</p>
-    </div>
+  return React.createElement('div', { className: "flex flex-col items-center justify-center p-8 gap-6 text-center" },
+    React.createElement(LoadingSpinnerIcon),
+    React.createElement('h2', { className: "text-2xl font-bold text-indigo-400" }, t('loadingTitle')),
+    React.createElement('p', { className: "text-slate-400 min-h-[40px]" }, t(messageKey))
   );
 };
-
-export default LoadingDisplay;

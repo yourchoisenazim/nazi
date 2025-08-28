@@ -1,39 +1,53 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { AppStatus } from './types';
-import { generateVideoFromImage } from './services/geminiService';
-import Header from './components/Header';
-import ImageUploader from './components/ImageUploader';
-import PromptInput from './components/PromptInput';
-import LoadingDisplay from './components/LoadingDisplay';
-import VideoPlayer from './components/VideoPlayer';
-import { ArrowPathIcon, PlayCircleIcon } from './components/Icons';
-import { useLocale, Locale } from './i18n';
+import { useLocale } from './i18n.ts';
+import { AppStatus } from './types.ts';
+import { generateVideoFromImage } from './services/geminiService.ts';
+import { Header } from './components/Header.tsx';
+import { ImageUploader } from './components/ImageUploader.tsx';
+import { PromptInput } from './components/PromptInput.tsx';
+import { LoadingDisplay } from './components/LoadingDisplay.tsx';
+import { VideoPlayer } from './components/VideoPlayer.tsx';
+import { PlayCircleIcon, ArrowPathIcon } from './components/Icons.tsx';
 
-const fileToBase64 = (file: File): Promise<string> => {
+const fileToBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
-      const result = reader.result as string;
-      // Remove the data URL prefix e.g. "data:image/png;base64,"
-      resolve(result.split(',')[1]);
+      const result = reader.result;
+      if (typeof result === 'string') {
+        resolve(result.split(',')[1]);
+      } else {
+        reject(new Error("Could not read file as a data URL string."));
+      }
     };
     reader.onerror = error => reject(error);
   });
 };
 
-
-const App: React.FC = () => {
+export const App = () => {
   const { t, locale, setLocale, availableLocales } = useLocale();
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState<string>('');
-  const [generatedVideo, setGeneratedVideo] = useState<{ url: string; blob: Blob } | null>(null);
-  const [status, setStatus] = useState<AppStatus>(AppStatus.IDLE);
-  const [error, setError] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [imageBase64, setImageBase64] = useState(null);
+  const [prompt, setPrompt] = useState('');
+  const [generatedVideo, setGeneratedVideo] = useState(null);
+  const [status, setStatus] = useState(AppStatus.IDLE);
+  const [error, setError] = useState(null);
 
-  const handleImageSelect = useCallback(async (file: File) => {
+  useEffect(() => {
+    if (!imageFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(imageFile);
+    setPreviewUrl(objectUrl);
+    
+    // Cleanup function to revoke the object URL to avoid memory leaks
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imageFile]);
+
+  const handleImageSelect = useCallback(async (file) => {
     setImageFile(file);
     setStatus(AppStatus.UPLOADING);
     try {
@@ -61,7 +75,22 @@ const App: React.FC = () => {
       setStatus(AppStatus.SUCCESS);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : t('errorUnknown'));
+      let messageToDisplay;
+      if (err instanceof Error) {
+        switch (err.message) {
+          case 'SAFETY_ERROR':
+            messageToDisplay = t('errorSafety');
+            break;
+          case 'QUOTA_ERROR':
+            messageToDisplay = t('errorQuota');
+            break;
+          default:
+            messageToDisplay = err.message;
+        }
+      } else {
+        messageToDisplay = t('errorUnknown');
+      }
+      setError(messageToDisplay);
       setStatus(AppStatus.ERROR);
     }
   };
@@ -80,76 +109,68 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (status) {
       case AppStatus.GENERATING:
-        return <LoadingDisplay />;
+        return React.createElement(LoadingDisplay);
       case AppStatus.SUCCESS:
-        return generatedVideo ? (
-          <VideoPlayer src={generatedVideo.url} blob={generatedVideo.blob} onReset={handleReset} />
-        ) : null;
+        return generatedVideo ?
+          React.createElement(VideoPlayer, { src: generatedVideo.url, blob: generatedVideo.blob, onReset: handleReset }) :
+          null;
       case AppStatus.ERROR:
-        return (
-          <div className="text-center p-8 bg-red-900/20 rounded-lg">
-            <p className="text-red-400 font-semibold">{t('animationFailed')}</p>
-            <p className="mt-2 text-red-300">{error}</p>
-            <button
-              onClick={handleReset}
-              className="mt-6 inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-            >
-              <ArrowPathIcon />
-              {t('tryAgainButton')}
-            </button>
-          </div>
+        return React.createElement('div', { className: "text-center p-8 bg-red-900/20 rounded-lg" },
+          React.createElement('p', { className: "text-red-400 font-semibold" }, t('animationFailed')),
+          React.createElement('p', { className: "mt-2 text-red-300" }, error),
+          React.createElement('button', {
+            onClick: handleReset,
+            className: "mt-6 inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+          },
+            React.createElement(ArrowPathIcon),
+            t('tryAgainButton')
+          )
         );
       default:
-        return (
-          <div className="w-full flex flex-col gap-6">
-            <ImageUploader 
-              onImageSelect={handleImageSelect}
-              previewUrl={imageFile ? URL.createObjectURL(imageFile) : null} 
-              disabled={isGenerating}
-            />
-            <PromptInput 
-              value={prompt} 
-              onChange={setPrompt}
-              disabled={isGenerating}
-            />
-            <button
-              onClick={handleGenerate}
-              disabled={!imageBase64 || !prompt || isGenerating}
-              className="w-full mt-2 inline-flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-transform duration-200 text-lg transform active:scale-95"
-            >
-              <PlayCircleIcon />
-              {t('animateButton')}
-            </button>
-          </div>
+        return React.createElement('div', { className: "w-full flex flex-col gap-6" },
+          React.createElement(ImageUploader, {
+            onImageSelect: handleImageSelect,
+            previewUrl: previewUrl,
+            disabled: isGenerating
+          }),
+          React.createElement(PromptInput, {
+            value: prompt,
+            onChange: setPrompt,
+            disabled: isGenerating
+          }),
+          React.createElement('button', {
+            onClick: handleGenerate,
+            disabled: !imageBase64 || !prompt || isGenerating,
+            className: "w-full mt-2 inline-flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-transform duration-200 text-lg transform active:scale-95"
+          },
+            React.createElement(PlayCircleIcon),
+            t('animateButton')
+          )
         );
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-900 text-gray-200 flex flex-col items-center p-4 sm:p-6">
-      <Header />
-      <main className="w-full max-w-2xl mx-auto mt-8 p-6 sm:p-8 bg-slate-800/50 rounded-2xl shadow-2xl shadow-indigo-900/20 border border-slate-700 backdrop-blur-sm">
-        {renderContent()}
-      </main>
-      <footer className="text-center py-6 mt-8 text-slate-500 text-sm">
-        <p>{t('footerText')}</p>
-        <div className="mt-4">
-          <select
-            value={locale}
-            onChange={(e) => setLocale(e.target.value as Locale)}
-            className="bg-slate-800 border border-slate-700 rounded-md py-1 px-2 text-slate-300 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-            aria-label="Select language"
-          >
-            {availableLocales.map((loc) => (
-              <option key={loc} value={loc}>
-                {loc.toUpperCase()}
-              </option>
-            ))}
-          </select>
-        </div>
-      </footer>
-    </div>
+  return React.createElement('div', { className: "min-h-screen text-gray-200 flex flex-col items-center p-4 sm:p-6" },
+    React.createElement(Header),
+    React.createElement('main', { className: "w-full max-w-2xl mx-auto mt-8 p-6 sm:p-8 bg-slate-800/50 rounded-2xl shadow-2xl shadow-indigo-900/20 border border-slate-700 backdrop-blur-sm" },
+      renderContent()
+    ),
+    React.createElement('footer', { className: "text-center py-6 mt-8 text-slate-300 text-sm" },
+      React.createElement('p', null, t('footerText')),
+      React.createElement('div', { className: "mt-4" },
+        React.createElement('select', {
+          value: locale,
+          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setLocale(e.target.value),
+          className: "bg-slate-800 border border-slate-700 rounded-md py-1 px-2 text-slate-300 text-xs focus:ring-indigo-500 focus:border-indigo-500",
+          'aria-label': "Select language"
+        },
+          availableLocales.map((loc) => (
+            React.createElement('option', { key: loc, value: loc },
+              loc.toUpperCase()
+            )
+          ))
+        )
+      )
+    )
   );
 };
-
-export default App;

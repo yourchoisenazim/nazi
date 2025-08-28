@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { useState, createContext, useContext } from 'react';
 
 const translations = {
   en: {
@@ -13,6 +13,8 @@ const translations = {
     errorFileRead: 'Failed to read the image file.',
     errorMissingInputs: 'Please upload an image and provide an animation prompt.',
     errorUnknown: 'An unknown error occurred during video generation.',
+    errorSafety: 'The request was blocked due to safety policies. Please try a different image or prompt.',
+    errorQuota: "You've exceeded your API quota. Please check your plan and billing details, and try again later.",
     animationFailed: 'Animation Failed',
     tryAgainButton: 'Try Again',
     loadingTitle: 'Animating Your Image',
@@ -39,6 +41,8 @@ const translations = {
     errorFileRead: 'Error al leer el archivo de imagen.',
     errorMissingInputs: 'Por favor, sube una imagen y proporciona una instrucción de animación.',
     errorUnknown: 'Ocurrió un error desconocido durante la generación del video.',
+    errorSafety: 'La solicitud fue bloqueada por políticas de seguridad. Por favor, intenta con una imagen o instrucción diferente.',
+    errorQuota: 'Has excedido tu cuota de API. Por favor, revisa tu plan y detalles de facturación, e inténtalo de nuevo más tarde.',
     animationFailed: 'Falló la Animación',
     tryAgainButton: 'Intentar de Nuevo',
     loadingTitle: 'Animando Tu Imagen',
@@ -65,6 +69,8 @@ const translations = {
     errorFileRead: "Échec de la lecture du fichier image.",
     errorMissingInputs: "Veuillez télécharger une image et fournir une instruction d'animation.",
     errorUnknown: "Une erreur inconnue s'est produite lors de la génération de la vidéo.",
+    errorSafety: "La demande a été bloquée pour des raisons de sécurité. Veuillez essayer une autre image ou une autre instruction.",
+    errorQuota: "Vous avez dépassé votre quota d'API. Veuillez vérifier votre forfait et vos informations de facturation, puis réessayez plus tard.",
     animationFailed: "L'animation a Échoué",
     tryAgainButton: 'Réessayer',
     loadingTitle: 'Animation de Votre Image',
@@ -81,34 +87,23 @@ const translations = {
   },
 };
 
-export type Locale = keyof typeof translations;
-export type TranslationKey = keyof (typeof translations)['en'];
-
-const getInitialLocale = (): Locale => {
+const getInitialLocale = () => {
   if (typeof window === 'undefined') return 'en';
   const browserLang = navigator.language.split(/[-_]/)[0];
-  return browserLang in translations ? (browserLang as Locale) : 'en';
+  return browserLang in translations ? browserLang : 'en';
 };
 
-interface LocaleContextType {
-  locale: Locale;
-  setLocale: (locale: Locale) => void;
-  t: (key: TranslationKey) => string;
-  availableLocales: Locale[];
-  loadingMessagesKeys: TranslationKey[];
-}
+const LocaleContext = createContext(undefined);
 
-const LocaleContext = createContext<LocaleContextType | undefined>(undefined);
+export const LocaleProvider = ({ children }) => {
+  const [locale, setLocale] = useState(getInitialLocale());
 
-export const LocaleProvider = ({ children }: { children: ReactNode }) => {
-  const [locale, setLocale] = useState<Locale>(getInitialLocale());
-
-  const t = (key: TranslationKey): string => {
+  const t = (key) => {
     return translations[locale]?.[key] || translations['en'][key] || key;
   };
   
-  const availableLocales = Object.keys(translations) as Locale[];
-  const loadingMessagesKeys: TranslationKey[] = [
+  const availableLocales = Object.keys(translations);
+  const loadingMessagesKeys = [
     'loadingMsg1', 'loadingMsg2', 'loadingMsg3', 'loadingMsg4', 'loadingMsg5', 'loadingMsg6', 'loadingMsg7'
   ];
 
