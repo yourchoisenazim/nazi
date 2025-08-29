@@ -159,8 +159,7 @@ const useLocale = () => {
 };
 
 // --- From services/geminiService.ts ---
-const API_KEY = "AIzaSyDMbwVMxYHBJ-1N2wqqafgB0XsEneiIYNk";
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const isSafetyError = (error) => {
     const message = error?.error?.message || error?.message || '';
     const lowerMessage = String(message).toLowerCase();
@@ -264,7 +263,7 @@ const generateVideoFromImage = async (base64ImageData, mimeType, prompt) => {
         throw new Error("Video generation completed, but the result was malformed and did not contain a download link.");
     }
     console.log("Fetching video from download link:", downloadLink);
-    const response = await fetch(`${downloadLink}&key=${API_KEY}`);
+    const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
     if (!response.ok) {
         const errorText = await response.text();
         console.error("Failed to download video. Status:", response.status, "Body:", errorText);
